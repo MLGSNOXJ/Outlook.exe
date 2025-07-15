@@ -12,9 +12,6 @@
 #include <conio.h>
 #include <algorithm>
 
-// Добавьте это перед всеми включениями, если проблема сохраняется
-// #define NOMINMAX
-
 std::wstring EscapeForPowerShell(const std::wstring& input) {
     std::wstring result;
     for (wchar_t c : input) {
@@ -138,7 +135,21 @@ void InitConsole() {
     SetConsoleTitleW(L"Outlook Email Sender");
 }
 
-void PrintHeader(const std::wstring& recipient, const std::wstring& ccRecipient, const std::wstring& bccRecipient) {
+std::wstring GetCurrentDateFormatted() {
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+    std::tm localNow;
+    localtime_s(&localNow, &now_time);
+
+    std::wstringstream wss;
+    wss << std::setw(2) << std::setfill(L'0') << localNow.tm_mday << L"."
+        << std::setw(2) << std::setfill(L'0') << (localNow.tm_mon + 1) << L"."
+        << (localNow.tm_year + 1900);
+
+    return wss.str();
+}
+
+void PrintHeader(const std::wstring& recipient, const std::wstring& ccRecipient, const std::wstring& bccRecipient, int sendHour, int sendMinute) {
     system("cls");
     std::wcout << L"=== Служба отправки писем через Outlook ===" << std::endl;
     std::wcout << L"Отправитель: getpro0576@gmail.com" << std::endl;
@@ -157,39 +168,27 @@ void PrintHeader(const std::wstring& recipient, const std::wstring& ccRecipient,
         << L"Тел.: +7 (8452) 30-35-02\n"
         << L"Моб.: +7 (937) 25-141-50\n"
         << L"E-mail: va.chernov@rossetivolga.ru" << std::endl;
-    std::wcout << L"Время отправки: 10:01 утра" << std::endl;
+    std::wcout << L"Время отправки: " << std::setw(2) << std::setfill(L'0') << sendHour << L":"
+        << std::setw(2) << std::setfill(L'0') << sendMinute << std::endl;
     std::wcout << L"===========================================" << std::endl;
     std::wcout << L"Ожидание времени отправки..." << std::endl;
-    std::wcout << L"Нажмите 'm' для изменения адресов получателей" << std::endl << std::endl;
+    std::wcout << L"Нажмите 'm' для изменения настроек" << std::endl << std::endl;
 }
 
-std::wstring GetCurrentDateFormatted() {
-    auto now = std::chrono::system_clock::now();
-    std::time_t now_time = std::chrono::system_clock::to_time_t(now);
-    std::tm localNow;
-    localtime_s(&localNow, &now_time);
-
-    std::wstringstream wss;
-    wss << std::setw(2) << std::setfill(L'0') << localNow.tm_mday << L"."
-        << std::setw(2) << std::setfill(L'0') << (localNow.tm_mon + 1) << L"."
-        << (localNow.tm_year + 1900);
-
-    return wss.str();
-}
-
-void ShowMenu(std::wstring& recipient, std::wstring& ccRecipient, std::wstring& bccRecipient) {
+void ShowMenu(std::wstring& recipient, std::wstring& ccRecipient, std::wstring& bccRecipient, int& sendHour, int& sendMinute) {
     int choice;
     do {
-        std::wcout << L"\n=== Меню настройки получателей ===" << std::endl;
+        std::wcout << L"\n=== Меню настройки ===" << std::endl;
         std::wcout << L"1. Изменить адрес получателя (Кому)" << std::endl;
         std::wcout << L"2. Изменить адрес получателя копии (Копия)" << std::endl;
         std::wcout << L"3. Изменить адрес скрытого получателя (Скрытая копия)" << std::endl;
-        std::wcout << L"4. Просмотреть текущие настройки" << std::endl;
-        std::wcout << L"5. Вернуться к ожиданию отправки" << std::endl;
+        std::wcout << L"4. Изменить время отправки" << std::endl;
+        std::wcout << L"5. Просмотреть текущие настройки" << std::endl;
+        std::wcout << L"6. Вернуться к ожиданию отправки" << std::endl;
         std::wcout << L"Выберите действие: ";
 
         std::wcin >> choice;
-        std::wcin.ignore((std::numeric_limits<std::streamsize>::max)(), L'\n'); // Добавлены скобки вокруг max
+        std::wcin.ignore((std::numeric_limits<std::streamsize>::max)(), L'\n');
 
         switch (choice) {
         case 1:
@@ -210,20 +209,47 @@ void ShowMenu(std::wstring& recipient, std::wstring& ccRecipient, std::wstring& 
             std::getline(std::wcin, bccRecipient);
             std::wcout << L"Адрес скрытого получателя изменен на: " << (bccRecipient.empty() ? L"(не указано)" : bccRecipient) << std::endl;
             break;
-        case 4:
-            std::wcout << L"\nТекущие настройки получателей:" << std::endl;
+        case 4: {
+            std::wcout << L"Текущее время отправки: "
+                << std::setw(2) << std::setfill(L'0') << sendHour << L":"
+                << std::setw(2) << std::setfill(L'0') << sendMinute << std::endl;
+
+            int newHour, newMinute;
+            std::wcout << L"Введите новый час отправки (0-23): ";
+            std::wcin >> newHour;
+            std::wcout << L"Введите новую минуту отправки (0-59): ";
+            std::wcin >> newMinute;
+
+            if (newHour >= 0 && newHour <= 23 && newMinute >= 0 && newMinute <= 59) {
+                sendHour = newHour;
+                sendMinute = newMinute;
+                std::wcout << L"Время отправки изменено на: "
+                    << std::setw(2) << std::setfill(L'0') << sendHour << L":"
+                    << std::setw(2) << std::setfill(L'0') << sendMinute << std::endl;
+            }
+            else {
+                std::wcout << L"Некорректное время. Изменения не сохранены." << std::endl;
+            }
+            std::wcin.ignore((std::numeric_limits<std::streamsize>::max)(), L'\n');
+            break;
+        }
+        case 5:
+            std::wcout << L"\nТекущие настройки:" << std::endl;
             std::wcout << L"Кому: " << recipient << std::endl;
             std::wcout << L"Копия: " << (ccRecipient.empty() ? L"(не указано)" : ccRecipient) << std::endl;
             std::wcout << L"Скрытая копия: " << (bccRecipient.empty() ? L"(не указано)" : bccRecipient) << std::endl;
+            std::wcout << L"Время отправки: "
+                << std::setw(2) << std::setfill(L'0') << sendHour << L":"
+                << std::setw(2) << std::setfill(L'0') << sendMinute << std::endl;
             break;
-        case 5:
+        case 6:
             std::wcout << L"Возвращаемся к ожиданию времени отправки..." << std::endl;
             break;
         default:
             std::wcout << L"Неверный выбор. Попробуйте снова." << std::endl;
             break;
         }
-    } while (choice != 5);
+    } while (choice != 6);
 }
 
 void ServiceMain() {
@@ -233,15 +259,20 @@ void ServiceMain() {
     const std::wstring subject = L"Ежедневный отчёт";
     const std::wstring fromEmail = L"getpro0576@gmail.com";
 
+    // Начальное время отправки
+    int sendHour = 16;
+    int sendMinute = 00;
+
     InitConsole();
-    PrintHeader(recipient, ccRecipient, bccRecipient);
+    PrintHeader(recipient, ccRecipient, bccRecipient, sendHour, sendMinute);
 
     while (true) {
+        // Проверка нажатия клавиши 'm' в любое время
         if (_kbhit()) {
             wchar_t ch = _getwch();
             if (ch == L'm' || ch == L'M') {
-                ShowMenu(recipient, ccRecipient, bccRecipient);
-                PrintHeader(recipient, ccRecipient, bccRecipient);
+                ShowMenu(recipient, ccRecipient, bccRecipient, sendHour, sendMinute);
+                PrintHeader(recipient, ccRecipient, bccRecipient, sendHour, sendMinute);
             }
         }
 
@@ -250,7 +281,7 @@ void ServiceMain() {
         std::tm localNow;
         localtime_s(&localNow, &now_time);
 
-        if (localNow.tm_hour == 9 && localNow.tm_min == 17) {
+        if (localNow.tm_hour == sendHour && localNow.tm_min == sendMinute) {
             std::wstring currentDate = GetCurrentDateFormatted();
             std::wstring htmlBody =
                 L"<html>\n"
@@ -284,15 +315,30 @@ void ServiceMain() {
 
             if (success) {
                 std::wcout << L"УСПЕХ: " << statusMessage << std::endl;
-                std::wcout << L"Ожидание следующего времени отправки..." << std::endl << std::endl;
             }
             else {
                 std::wcout << L"ОШИБКА: " << statusMessage << std::endl;
             }
 
-            std::this_thread::sleep_for(std::chrono::seconds(61));
+            // Выводим сообщение и сразу продолжаем проверять ввод
+            std::wcout << L"Ожидание следующего времени отправки..." << std::endl;
+            std::wcout << L"Нажмите 'm' для изменения настроек" << std::endl << std::endl;
+
+            // Задержка, чтобы избежать повторной отправки в ту же минуту
+            for (int i = 0; i < 61; i++) {
+                if (_kbhit()) {
+                    wchar_t ch = _getwch();
+                    if (ch == L'm' || ch == L'M') {
+                        ShowMenu(recipient, ccRecipient, bccRecipient, sendHour, sendMinute);
+                        PrintHeader(recipient, ccRecipient, bccRecipient, sendHour, sendMinute);
+                        break;
+                    }
+                }
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+            }
         }
         else {
+            // Короткая задержка для уменьшения нагрузки на процессор
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
     }
